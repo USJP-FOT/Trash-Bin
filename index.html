@@ -2,31 +2,122 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Smart Bin Capture</title>
   <style>
     :root{--bg1:#4f46e5;--bg2:#7c3aed}
-    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      background:linear-gradient(135deg,var(--bg1),var(--bg2));min-height:100vh;display:grid;place-items:center}
-    .wrap{width:100%;max-width:420px;padding:16px}
-    .card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 18px 36px rgba(0,0,0,.15)}
-    h1{margin:0 0 8px;font-size:18px;text-align:center}
-    .subtitle{margin:0 0 12px;font-size:12px;text-align:center;color:#6b7280}
-    video{display:block;width:100%;max-height:220px;object-fit:cover;border-radius:12px;background:#f3f4f6;border:1px solid #e5e7eb}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+    
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:linear-gradient(135deg,var(--bg1),var(--bg2));
+      height:100vh;width:100vw;overflow:hidden;
+      display:flex;align-items:center;justify-content:center;
+      position:fixed;top:0;left:0;
+    }
+    
+    /* Landscape-specific layout */
+    .container{
+      width:100vw;height:100vh;display:flex;
+      background:rgba(255,255,255,0.95);
+      backdrop-filter:blur(10px);
+    }
+    
+    /* Left side - Camera view (takes most space) */
+    .camera-section{
+      flex:1;display:flex;flex-direction:column;
+      padding:12px;position:relative;
+    }
+    
+    /* Right side - Controls (compact) */
+    .controls-section{
+      width:280px;display:flex;flex-direction:column;
+      padding:20px;background:rgba(255,255,255,0.8);
+      border-left:1px solid rgba(0,0,0,0.1);
+      justify-content:center;gap:16px;
+    }
+    
+    /* Header styling */
+    .header{
+      text-align:center;margin-bottom:12px;
+    }
+    h1{font-size:20px;margin:0 0 4px;color:#1f2937}
+    .subtitle{font-size:12px;color:#6b7280;margin:0}
+    
+    /* Video styling - full area */
+    video{
+      width:100%;height:100%;object-fit:cover;
+      border-radius:16px;background:#f3f4f6;
+      border:2px solid rgba(255,255,255,0.8);
+      box-shadow:0 8px 24px rgba(0,0,0,0.15);
+    }
+    canvas{display:none}
+    
+    /* Button styling */
+    .btn{
+      width:100%;display:flex;align-items:center;justify-content:center;
+      gap:8px;border:0;border-radius:16px;padding:16px;
+      font-size:16px;font-weight:600;color:#fff;
+      background:linear-gradient(45deg,var(--bg1),var(--bg2));
+      box-shadow:0 8px 20px rgba(79,70,229,.4);
+      cursor:pointer;transition:all .2s ease;
+      touch-action:manipulation;
+    }
+    .btn:active{transform:translateY(2px) scale(.98)}
+    .btn[disabled]{opacity:.6;cursor:not-allowed;box-shadow:none}
+    
+    /* Spinner */
+    .spinner{
+      width:18px;height:18px;border:3px solid rgba(255,255,255,.3);
+      border-top-color:#fff;border-radius:50%;
+      animation:spin 1s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    
+    /* Messages */
+    .msg{
+      border-radius:12px;padding:12px;font-size:13px;
+      margin-top:8px;display:none;text-align:center;
+    }
+    .msg.ok{display:block;background:#dcfce7;border:1px solid #86efac;color:#065f46}
+    .msg.err{display:block;background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d}
+    
+    /* Hints */
+    .hint{
+      color:#6b7280;font-size:11px;text-align:center;
+      margin-top:8px;line-height:1.3;
+    }
+    
+    /* Status indicator */
+    .status{
+      position:absolute;top:16px;left:16px;
+      background:rgba(0,0,0,0.7);color:#fff;
+      padding:6px 12px;border-radius:20px;font-size:11px;
+      display:flex;align-items:center;gap:6px;
+      backdrop-filter:blur(10px);
+    }
+    .status-dot{
+      width:6px;height:6px;border-radius:50%;
+      background:#10b981;animation:pulse 2s infinite;
+    }
+    @keyframes pulse{0%,100%{opacity:1} 50%{opacity:.5}}
     
     /* Popup overlay styles */
     .popup-overlay{
-      position:fixed;top:0;left:0;width:100%;height:100%;
-      background:rgba(0,0,0,0.8);z-index:1000;
+      position:fixed;top:0;left:0;width:100vw;height:100vh;
+      background:rgba(0,0,0,0.9);z-index:1000;
       display:flex;align-items:center;justify-content:center;
       opacity:0;visibility:hidden;
       transition:opacity 0.3s ease,visibility 0.3s ease;
     }
     .popup-overlay.show{opacity:1;visibility:visible}
     .popup-content{
-      background:#fff;border-radius:18px;padding:20px;
-      max-width:90%;max-height:90%;box-shadow:0 20px 40px rgba(0,0,0,0.3);
+      background:#fff;border-radius:20px;padding:24px;
+      max-width:90vw;max-height:90vh;
+      box-shadow:0 25px 50px rgba(0,0,0,0.5);
       transform:scale(0.9);transition:transform 0.3s ease;
     }
     .popup-overlay.show .popup-content{transform:scale(1)}
@@ -35,34 +126,63 @@
       display:block;margin:0 auto;
     }
     .popup-text{
-      text-align:center;margin-top:12px;font-size:14px;color:#374151;
+      text-align:center;margin-top:16px;font-size:16px;
+      color:#374151;font-weight:500;
     }
     .popup-timer{
-      text-align:center;margin-top:8px;font-size:12px;color:#6b7280;
+      text-align:center;margin-top:8px;font-size:13px;color:#6b7280;
     }
     
-    .btn{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:10px;margin-top:12px;border:0;border-radius:14px;
-      padding:14px 16px;font-size:16px;color:#fff;background:linear-gradient(45deg,var(--bg1),var(--bg2));
-      box-shadow:0 8px 18px rgba(79,70,229,.35);cursor:pointer;transition:transform .12s ease,opacity .12s ease}
-    .btn:active{transform:translateY(1px) scale(.995)}
-    .btn[disabled]{opacity:.6;cursor:not-allowed;box-shadow:none}
-    .spinner{width:18px;height:18px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .msg{margin-top:12px;border-radius:12px;padding:12px;font-size:14px;display:none}
-    .msg.ok{display:block;background:#dcfce7;border:1px solid #86efac;color:#065f46}
-    .msg.err{display:block;background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d}
-    .hint{margin-top:8px;color:#6b7280;font-size:11px;text-align:center}
+    /* Portrait mode warning */
+    @media (orientation: portrait) {
+      .portrait-warning{
+        display:flex;flex-direction:column;align-items:center;
+        justify-content:center;text-align:center;padding:20px;
+        color:#fff;height:100vh;
+      }
+      .portrait-warning h2{font-size:24px;margin-bottom:16px}
+      .portrait-warning p{font-size:16px;opacity:0.9;line-height:1.5}
+      .container{display:none}
+    }
+    
+    @media (orientation: landscape) {
+      .portrait-warning{display:none}
+    }
+    
+    /* Responsive adjustments for smaller landscape screens */
+    @media (orientation: landscape) and (max-height: 500px) {
+      .controls-section{width:240px;padding:16px}
+      h1{font-size:18px}
+      .btn{padding:14px;font-size:15px}
+      .status{top:12px;left:12px;padding:4px 10px}
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>Smart Trash Bin</h1>
-      <p class="subtitle">Camera is always live • tap to capture & send</p>
+  <!-- Portrait mode warning -->
+  <div class="portrait-warning">
+    <h2>📱 Rotate to Landscape</h2>
+    <p>This app is optimized for landscape mode.<br>Please rotate your device for the best experience.</p>
+  </div>
 
-      <!-- Live camera view -->
+  <!-- Main landscape interface -->
+  <div class="container">
+    <!-- Left side - Camera view -->
+    <div class="camera-section">
+      <div class="status" id="status">
+        <div class="status-dot"></div>
+        <span>LIVE</span>
+      </div>
       <video id="video" autoplay playsinline muted></video>
-      <canvas id="canvas" style="display:none;"></canvas>
+      <canvas id="canvas"></canvas>
+    </div>
+
+    <!-- Right side - Controls -->
+    <div class="controls-section">
+      <div class="header">
+        <h1>Smart Trash Bin</h1>
+        <p class="subtitle">Bin ID: <span id="binIdDisplay">1</span></p>
+      </div>
 
       <button id="takeBtn" class="btn">
         <span id="btnIcon" aria-hidden="true">📸</span>
@@ -70,7 +190,11 @@
       </button>
 
       <div id="msg" class="msg" role="status" aria-live="polite"></div>
-      <div class="hint" id="hint">If the camera doesn't appear, make sure you opened this page over HTTPS or localhost and allowed camera access.</div>
+      
+      <div class="hint" id="hint">
+        Ensure good lighting and clear view of items.<br>
+        Camera will start automatically.
+      </div>
     </div>
   </div>
 
@@ -89,6 +213,9 @@
     const TRASH_BIN_ID = Number(params.get("binId")) || 1;
     const API_URL = "https://physically-holy-longhorn.ngrok-free.app/trashBin/type";
 
+    // Update bin ID display
+    document.getElementById("binIdDisplay").textContent = TRASH_BIN_ID;
+
     // ====== ELEMENTS ======
     const takeBtn = document.getElementById("takeBtn");
     const btnText = document.getElementById("btnText");
@@ -101,6 +228,7 @@
     const popupImage = document.getElementById("popupImage");
     const popupText = document.getElementById("popupText");
     const popupTimer = document.getElementById("popupTimer");
+    const status = document.getElementById("status");
 
     let stream = null;
     let cameraReady = false;
@@ -112,16 +240,23 @@
 
     async function startCamera() {
       clearMsg();
+      status.innerHTML = '<div class="status-dot" style="background:#f59e0b;animation:none"></div><span>STARTING</span>';
 
       if (!navigator.mediaDevices?.getUserMedia) {
         showError("Camera not supported in this browser/webview.");
+        status.innerHTML = '<div class="status-dot" style="background:#ef4444;animation:none"></div><span>ERROR</span>';
         return false;
       }
 
+      // Optimized constraints for landscape mode
       const attempts = [
-        { video: { facingMode: { ideal: "environment" }, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
+        { video: { 
+          facingMode: { ideal: "environment" }, 
+          width: { ideal: 1280 }, height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        }, audio: false },
         { video: { facingMode: "environment" }, audio: false },
-        { video: true, audio: false } // final fallback
+        { video: true, audio: false }
       ];
 
       for (const c of attempts) {
@@ -129,21 +264,22 @@
           stream = await tryGetUserMedia(c);
           video.srcObject = stream;
 
-          // Ensure playback begins after metadata is loaded
           if (video.readyState < 2) {
             await new Promise(r => { video.onloadeddata = r; });
           }
-          await video.play().catch(()=>{}); // in case autoplay needs muted (we already set muted)
+          await video.play().catch(()=>{});
+          
           cameraReady = true;
-          hint.style.display = "none";
+          status.innerHTML = '<div class="status-dot"></div><span>LIVE</span>';
+          hint.innerHTML = "Ready to capture! Tap the button when you have items in view.";
           return true;
         } catch (err) {
-          // continue to next attempt
           console.debug("getUserMedia failed with constraints:", c, err);
         }
       }
 
-      showError("Unable to access the camera. Check HTTPS and permissions.");
+      showError("Unable to access camera. Check permissions and try refreshing.");
+      status.innerHTML = '<div class="status-dot" style="background:#ef4444;animation:none"></div><span>NO CAMERA</span>';
       return false;
     }
 
@@ -153,6 +289,7 @@
         stream = null;
       }
       cameraReady = false;
+      status.innerHTML = '<div class="status-dot" style="background:#6b7280;animation:none"></div><span>STOPPED</span>';
     }
 
     // ====== POPUP HELPERS ======
@@ -161,7 +298,6 @@
       popupText.textContent = message;
       popup.classList.add("show");
       
-      // Start countdown timer
       let countdown = 3;
       popupTimer.textContent = `Closing in ${countdown} seconds...`;
       
@@ -182,17 +318,16 @@
 
     // ====== CAPTURE + SEND ======
     async function captureAndSend() {
-      // If camera not started, start it first
       if (!cameraReady) {
         const ok = await startCamera();
-        if (ok) setOk("Camera started. Tap again to capture & send.");
+        if (ok) setOk("Camera started. Ready to capture!");
         return;
       }
 
       clearMsg();
 
-      // Draw current frame to canvas (scale to ~640w to reduce payload)
-      const targetW = 640;
+      // Use higher resolution for better quality
+      const targetW = 1024;
       const scale = targetW / video.videoWidth;
       const w = Math.round(video.videoWidth * scale);
       const h = Math.round(video.videoHeight * scale);
@@ -202,11 +337,9 @@
       const ctx = canvas.getContext("2d");
       ctx.drawImage(video, 0, 0, w, h);
 
-      // Get image data
-      const dataURL = canvas.toDataURL("image/jpeg", 0.8);
-
-      // Prepare payload
+      const dataURL = canvas.toDataURL("image/jpeg", 0.85);
       const base64Data = dataURL.split(",")[1];
+      
       const payload = {
         image_b64: base64Data,
         actualValue: "n/a",
@@ -224,9 +357,8 @@
 
         const text = await res.text();
         if (res.ok) {
-          // Show popup with captured image and success message
           showPopup(dataURL, "Success: " + text);
-          setOk("Image sent successfully!");
+          setOk("Image processed successfully!");
         } else {
           showError("API Error (" + res.status + "): " + text);
         }
@@ -234,17 +366,16 @@
         showError("Network Error: " + err.message);
       } finally {
         setLoading(false);
-        // Keep camera running for continuous use
       }
     }
 
-    // ====== UI ======
+    // ====== UI HELPERS ======
     function setLoading(isLoading) {
       takeBtn.disabled = isLoading;
       if (isLoading) {
         btnIcon.innerHTML = "";
         btnIcon.className = "spinner";
-        btnText.textContent = "Sending…";
+        btnText.textContent = "Processing…";
       } else {
         btnIcon.className = "";
         btnIcon.innerHTML = "📸";
@@ -273,20 +404,59 @@
     // ====== EVENTS ======
     takeBtn.addEventListener("click", captureAndSend);
     
-    // Close popup when clicking overlay
     popup.addEventListener("click", (e) => {
       if (e.target === popup) {
         hidePopup();
       }
     });
 
-    // Start camera immediately when page loads
+    // Prevent zoom on double tap
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (event) {
+      const now = (new Date()).getTime();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
+
+    // Handle orientation changes
+    window.addEventListener('orientationchange', function() {
+      setTimeout(() => {
+        if (cameraReady) {
+          // Restart camera to adjust to new orientation
+          stopCamera();
+          startCamera();
+        }
+      }, 500);
+    });
+
+    // Initialize camera on load
     window.addEventListener("load", () => {
       startCamera();
     });
 
     window.addEventListener("pagehide", stopCamera);
     window.addEventListener("beforeunload", stopCamera);
+
+    // Fullscreen API for better immersion
+    function requestFullscreen() {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+      }
+    }
+
+    // Auto-request fullscreen on first user interaction
+    let hasRequestedFullscreen = false;
+    takeBtn.addEventListener('click', () => {
+      if (!hasRequestedFullscreen && !document.fullscreenElement) {
+        requestFullscreen();
+        hasRequestedFullscreen = true;
+      }
+    });
   </script>
 </body>
 </html>
